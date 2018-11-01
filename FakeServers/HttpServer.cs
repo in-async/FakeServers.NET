@@ -10,8 +10,14 @@ namespace Inasync.FakeServers {
     public interface IHttpServer : IDisposable {
 
         /// <summary>
+        /// HTTP Server が稼働しているか否か。
+        /// </summary>
+        bool IsListening { get; }
+
+        /// <summary>
         /// HTTP Server を起動します。
         /// </summary>
+        /// <exception cref="HttpListenerException"></exception>
         void Start();
 
         /// <summary>
@@ -30,6 +36,11 @@ namespace Inasync.FakeServers {
     /// </summary>
     public abstract class HttpServer : IHttpServer {
 
+        /// <summary>
+        /// ローカルマシン上で空いているポート番号を返します。
+        /// </summary>
+        /// <returns>利用可能なポート番号。</returns>
+        /// <exception cref="SocketException"></exception>
         public static int GetAvailablePort() {
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -48,6 +59,8 @@ namespace Inasync.FakeServers {
             _listener.Prefixes.Add(uriPrefix);
         }
 
+        public bool IsListening => _listener.IsListening;
+
         public void Start() {
             _listener.Start();
             _listener.BeginGetContext(OnGetContext, null);
@@ -58,6 +71,8 @@ namespace Inasync.FakeServers {
         public void Close() => _listener.Close();
 
         private void OnGetContext(IAsyncResult asyncResult) {
+            if (_disposed) { return; }
+
             try {
                 var context = _listener.EndGetContext(asyncResult);
                 OnRequest(context);
@@ -66,7 +81,7 @@ namespace Inasync.FakeServers {
                 OnException(ex);
             }
 
-            if (_listener.IsListening) {
+            if (!_disposed && _listener.IsListening) {
                 _listener.BeginGetContext(OnGetContext, null);
             }
         }
@@ -81,11 +96,11 @@ namespace Inasync.FakeServers {
 
         protected virtual void Dispose(bool disposing) {
             if (!_disposed) {
+                _disposed = true;
+
                 if (disposing) {
                     _listener.Abort();
                 }
-
-                _disposed = true;
             }
         }
 

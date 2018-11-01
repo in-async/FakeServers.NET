@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Net;
 
 namespace Inasync.FakeServers {
@@ -9,27 +8,29 @@ namespace Inasync.FakeServers {
     /// </summary>
     public sealed class FakeHttpServer : HttpServer {
 
-        public static FakeHttpServer StartNew(string url, Action<HttpListenerRequest, HttpListenerResponse> handler) {
-            var httpServer = new FakeHttpServer(url, handler);
+        public static FakeHttpServer StartNew(string url, Action<HttpListenerRequest, HttpListenerResponse> requestHandler, Action<Exception> exceptionHandler) {
+            var httpServer = new FakeHttpServer(url, requestHandler, exceptionHandler);
             httpServer.Start();
             return httpServer;
         }
 
-        private readonly Action<HttpListenerRequest, HttpListenerResponse> _handler;
+        private readonly Action<HttpListenerRequest, HttpListenerResponse> _requestHandler;
+        private readonly Action<Exception> _exceptionHandler;
 
-        public FakeHttpServer(string url, Action<HttpListenerRequest, HttpListenerResponse> handler) : base(url) {
-            _handler = handler;
+        public FakeHttpServer(string url, Action<HttpListenerRequest, HttpListenerResponse> requestHandler, Action<Exception> exceptionHandler) : base(url) {
+            _requestHandler = requestHandler;
+            _exceptionHandler = exceptionHandler;
         }
 
         protected override void OnRequest(HttpListenerContext context) {
             var request = context.Request;
             using (var response = context.Response) {
-                _handler?.Invoke(request, response);
+                _requestHandler?.Invoke(request, response);
             }
         }
 
         protected override void OnException(Exception exception) {
-            Trace.TraceError(exception.ToString());
+            _exceptionHandler?.Invoke(exception);
         }
     }
 }
